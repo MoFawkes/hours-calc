@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Denovo Attendance Report</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --blue:       #2E74B5;
+    --dark-blue:  #1F3964;
+    --light-blue: #EBF3FB;
+    --border:     #D0DCE9;
+    --text:       #1a2332;
+    --muted:      #6b7f96;
+    --green:      #2e7d32;
+    --green-bg:   #e8f5e9;
+    --red:        #c62828;
+    --red-bg:     #ffebee;
+    --radius:     10px;
+    --shadow:     0 2px 12px rgba(0,0,0,.08);
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f0f4f8;
+    color: var(--text);
+    min-height: 100vh;
+    padding: 40px 20px 80px;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  header h1 {
+    font-size: 1.7rem;
+    font-weight: 700;
+    color: var(--dark-blue);
+    letter-spacing: -.3px;
+  }
+  header p {
+    margin-top: 6px;
+    color: var(--muted);
+    font-size: .93rem;
+  }
+
+  .card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 28px 32px;
+    max-width: 680px;
+    margin: 0 auto 24px;
+  }
+
+  .step-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .step-num {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--blue);
+    color: #fff;
+    font-size: .78rem;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .step-label h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--dark-blue);
+  }
+
+  /* Drop zone */
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 32px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .18s, background .18s;
+    position: relative;
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--blue);
+    background: var(--light-blue);
+  }
+  .drop-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%;
+  }
+  .drop-icon {
+    font-size: 2rem;
+    margin-bottom: 8px;
+    line-height: 1;
+  }
+  .drop-zone p {
+    color: var(--muted);
+    font-size: .9rem;
+  }
+  .drop-zone p strong {
+    color: var(--blue);
+  }
+  .drop-zone.has-file {
+    border-color: var(--green);
+    background: var(--green-bg);
+  }
+  .drop-zone.has-file .drop-icon { display: none; }
+  .file-name {
+    font-size: .9rem;
+    font-weight: 600;
+    color: var(--green);
+    display: none;
+  }
+  .drop-zone.has-file .file-name { display: block; }
+  .drop-zone.has-file .drop-hint { display: none; }
+
+  /* Parsing state */
+  .parse-status {
+    margin-top: 14px;
+    font-size: .88rem;
+    color: var(--muted);
+    text-align: center;
+    min-height: 20px;
+  }
+  .parse-status.error { color: var(--red); }
+
+  /* Week selector */
+  #week-selector { display: none; }
+
+  .month-group {
+    margin-bottom: 20px;
+  }
+  .month-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .month-header span {
+    font-weight: 600;
+    font-size: .95rem;
+    color: var(--dark-blue);
+    flex: 1;
+  }
+  .month-toggle {
+    font-size: .8rem;
+    color: var(--blue);
+    cursor: pointer;
+    padding: 2px 8px;
+    border: 1px solid var(--blue);
+    border-radius: 20px;
+    background: none;
+    transition: background .15s, color .15s;
+    white-space: nowrap;
+  }
+  .month-toggle:hover {
+    background: var(--blue);
+    color: #fff;
+  }
+
+  .week-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 8px;
+  }
+
+  .week-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    user-select: none;
+  }
+  .week-chip:hover { border-color: var(--blue); background: var(--light-blue); }
+  .week-chip input[type="checkbox"] { display: none; }
+  .week-chip.selected {
+    border-color: var(--blue);
+    background: var(--light-blue);
+  }
+  .week-chip .chip-box {
+    width: 16px; height: 16px;
+    border: 2px solid var(--border);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: border-color .15s, background .15s;
+  }
+  .week-chip.selected .chip-box {
+    border-color: var(--blue);
+    background: var(--blue);
+  }
+  .week-chip.selected .chip-box::after {
+    content: '';
+    width: 8px; height: 5px;
+    border-left: 2px solid #fff;
+    border-bottom: 2px solid #fff;
+    transform: rotate(-45deg) translateY(-1px);
+  }
+  .week-chip .chip-label {
+    font-size: .86rem;
+    color: var(--text);
+  }
+
+  .select-all-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .select-all-row span {
+    font-size: .85rem;
+    color: var(--muted);
+  }
+  .link-btn {
+    background: none;
+    border: none;
+    color: var(--blue);
+    font-size: .85rem;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+  }
+  .link-btn:hover { color: var(--dark-blue); }
+
+  /* Company field */
+  .field-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .field-row label {
+    font-size: .88rem;
+    font-weight: 600;
+    color: var(--dark-blue);
+  }
+  .field-row input[type="text"] {
+    padding: 10px 13px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    font-size: .95rem;
+    color: var(--text);
+    outline: none;
+    transition: border-color .15s;
+    width: 100%;
+  }
+  .field-row input[type="text"]:focus { border-color: var(--blue); }
+
+  /* Generate button */
+  #generate-btn {
+    display: block;
+    width: 100%;
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 15px;
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: .2px;
+    cursor: pointer;
+    transition: background .18s, transform .1s;
+    box-shadow: 0 4px 14px rgba(46,116,181,.35);
+  }
+  #generate-btn:hover:not(:disabled) { background: var(--dark-blue); }
+  #generate-btn:active:not(:disabled) { transform: scale(.98); }
+  #generate-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  #generate-status {
+    text-align: center;
+    margin-top: 14px;
+    font-size: .9rem;
+    color: var(--muted);
+    min-height: 20px;
+  }
+  #generate-status.error { color: var(--red); }
+  #generate-status.success { color: var(--green); font-weight: 600; }
+
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .info-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--light-blue);
+    color: var(--blue);
+    font-size: .8rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Denovo Attendance Report</h1>
+  <p>Generate a Word document report from ZKTeco biometric data</p>
+</header>
+
+<!-- Step 1: Upload .dat -->
+<div class="card">
+  <div class="step-label">
+    <div class="step-num">1</div>
+    <h2>Upload clocking data</h2>
+  </div>
+
+  <div class="drop-zone" id="dat-drop">
+    <input type="file" id="dat-input" accept=".dat,.txt">
+    <div class="drop-icon">📂</div>
+    <p class="drop-hint"><strong>Click or drag</strong> your <code>.dat</code> file here</p>
+    <p class="file-name" id="dat-filename"></p>
+  </div>
+
+  <div class="parse-status" id="parse-status"></div>
+</div>
+
+<!-- Step 2: Pick weeks -->
+<div class="card" id="week-selector">
+  <div class="step-label">
+    <div class="step-num">2</div>
+    <h2>Select weeks to include</h2>
+  </div>
+
+  <div class="select-all-row">
+    <span id="selection-count">0 weeks selected</span>
+    <div style="display:flex;gap:12px;">
+      <button class="link-btn" id="select-all-btn">Select all</button>
+      <button class="link-btn" id="clear-all-btn">Clear all</button>
+    </div>
+  </div>
+
+  <div id="month-groups"></div>
+</div>
+
+<!-- Step 3: Employee CSV + company -->
+<div class="card" id="csv-card" style="display:none">
+  <div class="step-label">
+    <div class="step-num">3</div>
+    <h2>Upload employee list</h2>
+  </div>
+
+  <div class="drop-zone" id="csv-drop">
+    <input type="file" id="csv-input" accept=".csv">
+    <div class="drop-icon">👥</div>
+    <p class="drop-hint"><strong>Click or drag</strong> the employee <code>.csv</code> file here</p>
+    <p class="file-name" id="csv-filename"></p>
+  </div>
+
+  <div style="margin-top: 20px;">
+    <div class="field-row">
+      <label for="company-input">Company name</label>
+      <input type="text" id="company-input" value="Denovo Apparel Ltd">
+    </div>
+  </div>
+</div>
+
+<!-- Generate -->
+<button id="generate-btn" disabled>Generate Report</button>
+<div id="generate-status"></div>
+
+<script>
+  // ---- State ----
+  let fileId = null;
+  let allWeeks = [];
+  let selectedWeeks = new Set();
+  let csvFile = null;
+
+  // ---- Drop zone helper ----
+  function initDropZone(zoneId, inputId, fileNameId, onFile) {
+    const zone = document.getElementById(zoneId);
+    const input = document.getElementById(inputId);
+    const nameEl = document.getElementById(fileNameId);
+
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (file) handleFile(file);
+    });
+    input.addEventListener('change', () => { if (input.files[0]) handleFile(input.files[0]); });
+
+    function handleFile(file) {
+      zone.classList.add('has-file');
+      nameEl.textContent = '✓  ' + file.name;
+      onFile(file);
+    }
+  }
+
+  // ---- .dat upload & parse ----
+  initDropZone('dat-drop', 'dat-input', 'dat-filename', handleDatFile);
+
+  function handleDatFile(file) {
+    const status = document.getElementById('parse-status');
+    status.className = 'parse-status';
+    status.textContent = 'Reading file…';
+
+    // Reset downstream
+    fileId = null;
+    allWeeks = [];
+    selectedWeeks.clear();
+    document.getElementById('week-selector').style.display = 'none';
+    document.getElementById('csv-card').style.display = 'none';
+    updateGenerateBtn();
+
+    const fd = new FormData();
+    fd.append('dat_file', file);
+
+    fetch('/parse-dat', { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(data => {
+        if (data.error) {
+          status.className = 'parse-status error';
+          status.textContent = '✗  ' + data.error;
+          return;
+        }
+        fileId = data.file_id;
+        allWeeks = data.weeks;
+
+        status.innerHTML = `<span class="info-pill">✓ ${data.employee_count} employee${data.employee_count !== 1 ? 's' : ''} · ${data.weeks.length} week${data.weeks.length !== 1 ? 's' : ''} found</span>`;
+
+        renderWeeks(data.weeks);
+        document.getElementById('week-selector').style.display = 'block';
+        document.getElementById('csv-card').style.display = 'block';
+      })
+      .catch(() => {
+        status.className = 'parse-status error';
+        status.textContent = '✗  Failed to read file. Please try again.';
+      });
+  }
+
+  // ---- Week renderer ----
+  function renderWeeks(weeks) {
+    const container = document.getElementById('month-groups');
+    container.innerHTML = '';
+    selectedWeeks.clear();
+
+    // Group by month
+    const months = {};
+    weeks.forEach(w => {
+      if (!months[w.month]) months[w.month] = { label: w.month_label, weeks: [] };
+      months[w.month].weeks.push(w);
+    });
+
+    Object.entries(months).forEach(([monthKey, { label, weeks: mweeks }]) => {
+      const group = document.createElement('div');
+      group.className = 'month-group';
+
+      const header = document.createElement('div');
+      header.className = 'month-header';
+      header.innerHTML = `<span>${label}</span><button class="month-toggle" data-month="${monthKey}">Select month</button>`;
+      group.appendChild(header);
+
+      const grid = document.createElement('div');
+      grid.className = 'week-grid';
+
+      mweeks.forEach(w => {
+        const chip = document.createElement('label');
+        chip.className = 'week-chip';
+        chip.dataset.weekId = w.week_id;
+        chip.innerHTML = `
+          <input type="checkbox" value="${w.week_id}">
+          <span class="chip-box"></span>
+          <span class="chip-label">${w.label}</span>
+        `;
+        chip.addEventListener('click', e => {
+          e.preventDefault();
+          toggleWeek(w.week_id, chip);
+        });
+        grid.appendChild(chip);
+      });
+
+      group.appendChild(grid);
+      container.appendChild(group);
+    });
+
+    // Month toggle buttons
+    container.querySelectorAll('.month-toggle').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const month = btn.dataset.month;
+        const monthWeeks = allWeeks.filter(w => w.month === month);
+        const chips = container.querySelectorAll(`.week-chip[data-week-id]`);
+        const monthChips = Array.from(chips).filter(c => monthWeeks.some(w => w.week_id === c.dataset.weekId));
+        const allSelected = monthWeeks.every(w => selectedWeeks.has(w.week_id));
+
+        monthWeeks.forEach(w => {
+          if (allSelected) selectedWeeks.delete(w.week_id);
+          else selectedWeeks.add(w.week_id);
+        });
+        monthChips.forEach(c => c.classList.toggle('selected', !allSelected));
+        btn.textContent = allSelected ? 'Select month' : 'Deselect month';
+        updateCount();
+        updateGenerateBtn();
+      });
+    });
+
+    updateCount();
+    updateGenerateBtn();
+  }
+
+  function toggleWeek(weekId, chip) {
+    if (selectedWeeks.has(weekId)) {
+      selectedWeeks.delete(weekId);
+      chip.classList.remove('selected');
+    } else {
+      selectedWeeks.add(weekId);
+      chip.classList.add('selected');
+    }
+    updateCount();
+    updateGenerateBtn();
+  }
+
+  document.getElementById('select-all-btn').addEventListener('click', () => {
+    allWeeks.forEach(w => selectedWeeks.add(w.week_id));
+    document.querySelectorAll('.week-chip').forEach(c => c.classList.add('selected'));
+    updateCount(); updateGenerateBtn();
+  });
+
+  document.getElementById('clear-all-btn').addEventListener('click', () => {
+    selectedWeeks.clear();
+    document.querySelectorAll('.week-chip').forEach(c => c.classList.remove('selected'));
+    updateCount(); updateGenerateBtn();
+  });
+
+  function updateCount() {
+    const n = selectedWeeks.size;
+    document.getElementById('selection-count').textContent = n === 0
+      ? 'No weeks selected'
+      : `${n} week${n !== 1 ? 's' : ''} selected`;
+  }
+
+  // ---- CSV upload ----
+  initDropZone('csv-drop', 'csv-input', 'csv-filename', file => {
+    csvFile = file;
+    updateGenerateBtn();
+  });
+
+  // ---- Generate ----
+  function updateGenerateBtn() {
+    const btn = document.getElementById('generate-btn');
+    btn.disabled = !(fileId && selectedWeeks.size > 0 && csvFile);
+  }
+
+  document.getElementById('generate-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('generate-btn');
+    const status = document.getElementById('generate-status');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Generating…';
+    status.className = 'parse-status';
+    status.textContent = '';
+
+    const fd = new FormData();
+    fd.append('file_id', fileId);
+    fd.append('csv_file', csvFile);
+    fd.append('company', document.getElementById('company-input').value);
+    selectedWeeks.forEach(w => fd.append('weeks', w));
+
+    try {
+      const resp = await fetch('/generate', { method: 'POST', body: fd });
+
+      if (!resp.ok) {
+        const err = await resp.json();
+        throw new Error(err.error || 'Unknown error');
+      }
+
+      // Trigger download
+      const blob = await resp.blob();
+      const disposition = resp.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      const filename = match ? match[1] : 'Attendance_Report.docx';
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      status.className = 'parse-status success';
+      status.textContent = '✓ Report downloaded successfully.';
+    } catch (e) {
+      status.className = 'parse-status error';
+      status.textContent = '✗ ' + e.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Generate Report';
+      updateGenerateBtn();
+    }
+  });
+</script>
+</body>
+</html>
