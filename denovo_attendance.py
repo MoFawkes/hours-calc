@@ -179,11 +179,13 @@ def process_day(raw_clockings: list) -> dict:
         break_is_actual: bool  (True = from clocked breaks, False = fixed schedule)
         break_over_limit: bool
     """
-    # Sort, cap, round, merge
+    # Sort → cap → merge duplicates on original times → round
+    # Merging before rounding prevents two close-but-distinct clockings
+    # (e.g. 10:56 and 11:02) from collapsing into one after both round to 11:00.
     sorted_c = sorted(raw_clockings)
     capped = [cap_to_work_start(c) for c in sorted_c]
-    rounded = [round_to_nearest(c) for c in capped]
-    merged = merge_duplicates(sorted(rounded))
+    merged_raw = merge_duplicates(capped)
+    merged = [round_to_nearest(c) for c in merged_raw]
 
     display = [dt.strftime("%H:%M") for dt in merged]
     n = len(merged)
